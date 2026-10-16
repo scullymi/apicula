@@ -336,6 +336,8 @@ class Netlist:
         # must have GND and VCC networks
         self.gnd_net_bits = self.in_file['modules'][self.top_module_name]['netnames']['$PACKER_GND']['bits']
         self.vcc_net_bits = self.in_file['modules'][self.top_module_name]['netnames']['$PACKER_VCC']['bits']
+        # (x, y, num) of the flip-flops whose input is the SEL wire, filled by get_pips()
+        self.ff_from_sel = set()
 
     def get_net_by_bits(self, net_bits: [int]):
         """ Returns net description """
@@ -388,6 +390,10 @@ class Netlist:
                     col, row, dest, src = res.groups()
                     # nextpnr creates the passtrough LUTs by itself, so skip such pips
                     if dest.startswith('XD') and src.startswith('F'):
+                        continue
+                    # a flip-flop fed from SEL has no pip fuses, REGx_SD selects the input
+                    if dest.startswith('XD') and src.startswith('SEL'):
+                        self.ff_from_sel.add((int(col), int(row), int(dest[2:])))
                         continue
                     if "DUMMY" in pip:
                         continue
@@ -1366,6 +1372,8 @@ class Device:
     #==============================
     def get_common_ff_fuses(self, bel: BelDesc, attr_vals: list[AttrVal]) -> list[CellFuseBits]:
         attr_vals.append(AttrVal('REGMODE', 'LATCH' if int(bel.cell.attrs.get('LATCH', '0')) else 'FF'))
+        if (bel.x, bel.y, bel.idx_int) in self.pnr.ff_from_sel:
+            attr_vals.append(AttrVal(f'REG{bel.idx_int % 2}_SD', '0'))
         self.used_slices.add_slice_attrs(bel.x, bel.y, bel.idx_int // 2, bel.idx_int % 2 == 0, bel.idx_int % 2 == 1, attr_vals)
         return []
 
