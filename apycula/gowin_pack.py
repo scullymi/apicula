@@ -1364,7 +1364,12 @@ class Device:
 
             self.used_slices.add_slice_attrs(bel.x, bel.y, i, False, False, [AttrVal('MODE', 'SSRAM')])
 
-        self.used_slices.add_slice_attrs(bel.x, bel.y, 2, False, False, [AttrVal('LSRONMUX', 'LSRMUX'), AttrVal('LSR_MUX_LSR', 'INV'), AttrVal('CLKMUX_1', 'UNKNOWN'), AttrVal('CLKMUX_CLK', 'SIG')])
+        # the write clock, inverted for a RAM on the falling edge (CLK_INV from nextpnr)
+        if int(bel.cell.parms.get('CLK_INV', '0'), 2):
+            clk = [AttrVal('REGMODE', 'FF'), AttrVal('CLKMUX_CLK', 'INV')]
+        else:
+            clk = [AttrVal('CLKMUX_CLK', 'SIG')]
+        self.used_slices.add_slice_attrs(bel.x, bel.y, 2, False, False, [AttrVal('LSRONMUX', 'LSRMUX'), AttrVal('LSR_MUX_LSR', 'INV'), AttrVal('CLKMUX_1', 'UNKNOWN')] + clk)
         return fuses
 
     #==============================
@@ -2810,6 +2815,11 @@ class Device:
         val = bel.cell.parms.get('RESET_MODE', 'SYNC')
         if val == 'ASYNC':
             self.chipdb.get_bsram_attr_val(AttrVal('OUTREG_ASYNC', 'RESET'), av)
+
+        # clock pins of ports on the falling edge (CLKA_INV, CLKB_INV from nextpnr)
+        for port in ('A', 'B'):
+            if int(bel.cell.parms.get(f'CLK{port}_INV', '0'), 2):
+                self.chipdb.get_bsram_attr_val(AttrVal(f'CLKMUX_CLK{port}', 'INV'), av)
         return av
 
     def common_bsram_handler(self, bel: BsramBelDesc, av: set[int]) -> list[CellFuseBits]:

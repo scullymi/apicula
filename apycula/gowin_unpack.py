@@ -602,6 +602,11 @@ def parse_tile_(db, row, col, tile, bm=None, default=True, noiostd = True):
                 if name == "RAM16" and not name in bels:
                     continue
                 bels.setdefault(name, set()).add(flag)
+        # the write clock of a RAM16 on the falling edge: the clock bit of slice 2
+        if name == "RAM16" and name in bels:
+            attrvals = parse_attrvals(tile, db.rev_logicinfo('SLICE'), db.shortval[tiledata.ttyp]['CLS2'], attrids.cls_attrids, "CLS")
+            if 'CLKMUX_CLK' in attrvals:
+                bels[name].add('CLK_INV')
         # revert BUFS flags
         if name.startswith('BUFS'):
             flags = bels.get(name, set()) ^ {'R', 'L'}
@@ -1113,6 +1118,14 @@ def tile2verilog(dbrow, dbcol, bels, pips, clock_pips, mod, cst, db):
             ram16.params["INIT_3"] = f"16'b{val3:016b}"
             ram16.portmap['DI'] = [f"R{row}C{col}_{x}5" for x in "DCBA"]
             ram16.portmap['CLK'] = f"R{row}C{col}_CLK2"
+            if 'CLK_INV' in flags:
+                inv = codegen.Primitive("LUT1", f"{name}_CLK_INV")
+                inv.params["INIT"] = "2'b01"
+                inv.portmap['I0'] = f"R{row}C{col}_CLK2"
+                inv.portmap['F'] = f"{name}_CLK_N"
+                mod.wires.update(inv.portmap.values())
+                mod.primitives[inv.inst] = inv
+                ram16.portmap['CLK'] = f"{name}_CLK_N"
             ram16.portmap['WRE'] = f"R{row}C{col}_LSR2"
             ram16.portmap['WAD'] = [f"R{row}C{col}_{x}4" for x in "DCBA"]
             ram16.portmap['RAD'] = [f"R{row}C{col}_{x}0" for x in "DCBA"]
