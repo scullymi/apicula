@@ -4461,6 +4461,12 @@ def set_chip_flags(dev, device):
         dev.chip_flags.append("NEED_BLKSEL_FIX")
     if device in {'GW1NZ-1'}:
         dev.chip_flags.append("HAS_BANDGAP")
+    # A BSRAM port 1, 2, 4, 8 or 9 bits wide takes its low address bits
+    # (AD[3:0], [3:1], [3:2] or [3] by width) at every clock, whatever CE
+    # says. The Gowin IDE holds these bits with a DFFE and a LUT unless CE is
+    # constant. nextpnr does the same when this flag is set.
+    if device in {'GW1NZ-1'}:
+        dev.chip_flags.append("NEED_BSRAM_ADDR_HOLD")
     if device in _hclk_to_pll:
         dev.chip_flags.append("HAS_PLL_HCLK")
     if device in {'GW2A-18', 'GW2A-18C'}:
